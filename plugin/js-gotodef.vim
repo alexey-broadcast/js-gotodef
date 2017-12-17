@@ -13,12 +13,13 @@ function! s:getSearchExpr(word)
 endfunction
 
 function! JsGotoDef()
-    echom g:ackprg
     " Step 0: save settings
     let saved_ack_qhandler = g:ack_qhandler
     let g:ack_qhandler = winnr('$') > 2 ? 'botright lopen' : 'belowright lopen'
     let saved_hlsearch = &hlsearch
     set hlsearch
+    let saved_ackprg = g:ackprg
+    let g:ackprg .= " -G js"
 
     " let isQuickfixOpened = 0
     " windo if &l:buftype == "quickfix" | let isQuickfixOpened = 1 | endif
@@ -49,6 +50,7 @@ function! JsGotoDef()
     endif
 
     " Step 3: restore settings
+    let g:ackprg = saved_ackprg
     let g:ack_qhandler = saved_ack_qhandler
     let &hlsearch = saved_hlsearch
 endfunction
