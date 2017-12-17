@@ -12,7 +12,7 @@ function! s:getSearchExpr(word)
     return 'function +'.a:word.'|'.a:word.' *[=:] *(\(|function|\S+ *=>)'
 endfunction
 
-function! s:gotoDef()
+function! JsGotoDef()
     echom g:ackprg
     " Step 0: save settings
     let saved_ack_qhandler = g:ack_qhandler
@@ -52,5 +52,3 @@ function! s:gotoDef()
     let g:ack_qhandler = saved_ack_qhandler
     let &hlsearch = saved_hlsearch
 endfunction
-
-nnoremap <C-]> :call <SID>gotoDef()<cr>
