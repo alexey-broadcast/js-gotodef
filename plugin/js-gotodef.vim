@@ -14,8 +14,8 @@ endfunction
 
 function! JsGotoDef()
     " Step 0: save settings
-    let saved_ack_qhandler = g:ack_qhandler
-    let g:ack_qhandler = winnr('$') > 2 ? 'botright lopen' : 'belowright lopen'
+    let saved_ack_lhandler = g:ack_lhandler
+    let g:ack_lhandler = ''
     let saved_hlsearch = &hlsearch
     set hlsearch
     let saved_ackprg = g:ackprg
@@ -42,15 +42,18 @@ function! JsGotoDef()
     let locList = getloclist(0)
 
     if (len(locList) == 1)
-        :ll! | lclose
-    " следующий if - ничего функционального не несет, только делает
-    " поменьше дергов когда всего одно окно (помимо NERDTree)
-    elseif (winnr('$') > 2)
-        :NERDTreeClose | NERDTree | wincmd l | wincmd j
+        :ll!
+    else
+        if (winnr('$') > 2) | botright lopen | else | belowright lopen | endif
+        " следующий if - ничего функционального не несет, только делает
+        " поменьше дергов когда всего одно окно (помимо NERDTree)
+        if (winnr('$') > 2)
+            :NERDTreeClose | NERDTree | wincmd l | wincmd j
+        endif
     endif
 
     " Step 3: restore settings
     let g:ackprg = saved_ackprg
-    let g:ack_qhandler = saved_ack_qhandler
+    let g:ack_lhandler = saved_ack_lhandler
     let &hlsearch = saved_hlsearch
 endfunction
