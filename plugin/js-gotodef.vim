@@ -42,7 +42,7 @@ function! JsGotoDef()
     let locList = getloclist(0)
 
     if (len(locList) == 1)
-        :ll!
+        :ll! | normal! zz
     else
         if (winnr('$') > 2) | botright lopen | else | belowright lopen | endif
         " следующий if - ничего функционального не несет, только делает
