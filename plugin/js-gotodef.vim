@@ -12,7 +12,23 @@ function! s:getSearchExpr(word)
     return 'function +'.a:word.'|'.a:word.' *[=:] *(\(|function|\S+ *=>)'
 endfunction
 
+function! s:countMatches(word)
+    let counter = [0]
+    keepjumps normal! vi}
+    let startPos = getpos('v')
+    let endPos = getpos('.')
+    echom 'startPos'
+    echom startPos[1]
+    echom 'endPos'
+    echom endPos[1]
+    exec "%s/".a:word."\\zs/\\=map(counter,'v:val+1')[1:]/ge"
+    return counter[0]
+endfunction
+
+" he search-range
+"" /\%>199l\%<300lsearchTerm
 function! JsGotoDef()
+    echom 'JsGotoDef()'
     " Step 0: save settings
     let saved_ack_lhandler = g:ack_lhandler
     let g:ack_lhandler = ''
@@ -32,6 +48,7 @@ function! JsGotoDef()
     if (empty(word))
         return
     endif
+    " echom 'count='. s:countMatches(word)
 
     let searchCommand = ":LAck! "
 
