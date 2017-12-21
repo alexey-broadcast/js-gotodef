@@ -11,7 +11,8 @@ let g:jsGotodefPath = "src/"
 function! s:getSearchExpr(word)
     let strongWord = '\b' . a:word . '\b'
     return 'function +'.strongWord .
-      \ '|(((const|var|let) )|\.)'.strongWord .
+      \ '|\.'.strongWord.'[^ ]*[=:]' .
+      \ '|(const|var|let) +'.strongWord .
       \ '|class +'.strongWord
 endfunction
 
