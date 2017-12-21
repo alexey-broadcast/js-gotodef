@@ -9,7 +9,9 @@ let g:jsGotodefPath = "src/"
 " TODO: search css classes
 " function +word|word *[=:] *(\(|function|\S+ *=>)
 function! s:getSearchExpr(word)
-    return 'function +'.a:word.'[^ ]*\(|[ \.]'.a:word.' *[=:] *(\(|function|\S+ *=>)'
+    return 'function +'.a:word.'[^ ]*\(' .
+      \ '|[ \.]'.a:word.' *[=:] *(\(|function|\S+ *=>)' .
+      \ '|class +'.a:word
 endfunction
 
 " bug: 
