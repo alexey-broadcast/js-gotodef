@@ -8,9 +8,19 @@ let g:jsGotodefPath = "src/"
 " Regex will look like this:
 " TODO: search css classes
 " function +word|word *[=:] *(\(|function|\S+ *=>)
-function! s:getSearchExpr(word)
+function! s:getSearchExprPerl(word)
     let strongWord = '\b' . a:word . '\b'
     return 'function\*? +'.strongWord .
+      \ '|\.'.strongWord.' *[=:]' .
+      \ '|'.strongWord.' *[=:]' .
+      \ '|(const|var|let) +'.strongWord .
+      \ '|class +'.strongWord
+endfunction
+
+function! s:getSearchExprVim(word)
+    let strongWord = a:word
+    return '\v' .
+      \  'function\*? +'.strongWord .
       \ '|\.'.strongWord.' *[=:]' .
       \ '|'.strongWord.' *[=:]' .
       \ '|(const|var|let) +'.strongWord .
@@ -21,7 +31,7 @@ endfunction
 " const lalala =
 "   (arg1, arg2) 
 
-function! JsGotoDef()
+function! JsGotoDef1()
     " Step 0: save settings
     let saved_ack_lhandler = g:ack_lhandler
     let g:ack_lhandler = ''
@@ -44,7 +54,7 @@ function! JsGotoDef()
 
     let searchCommand = ":LAck! "
 
-    let searchExpr = s:getSearchExpr(word)
+    let searchExpr = s:getSearchExprPerl(word)
 
     :execute searchCommand."'".searchExpr."' ".g:jsGotodefPath
 
@@ -66,3 +76,66 @@ function! JsGotoDef()
     let g:ack_lhandler = saved_ack_lhandler
     let &hlsearch = saved_hlsearch
 endfunction
+
+function! s:JsGotoDefInner(wordArg, position) 
+    " Step 0: save settings
+    if (a:position == -1)
+        let saved_magic = &magic
+        set magic
+
+        let saved_ignorecase = &ignorecase
+        set noignorecase
+
+        let saved_foldmethod = &foldmethod
+        set foldmethod=syntax
+    endif
+
+    " Step 1: run func
+    let word = a:wordArg ? a:wordArg : expand("<cword>")
+
+    if (empty(word))
+        return
+    endif
+
+    let searchExpr = s:getSearchExprVim(word)
+
+    let currentPos = line('.')
+    let currentFoldlevel = foldlevel('.')
+    let blockStartLine = 0
+    let blockEndLine = line('$')
+
+    let jumpCmdPrefix = a:position > -1 ? 'keepjumps ' : ''
+    execute jumpCmdPrefix . 'normal! ]}'
+    let searchInWholeFile = line('.') == currentPos
+    if (searchInWholeFile)
+        execute jumpCmdPrefix . 'normal! gg'
+    else
+        let blockEndLine = line('.')
+        keepjumps normal! [{
+        let blockStartLine = line('.')
+    endif
+
+    let lineNr = search(searchExpr, '', blockEndLine)
+    while (
+   \         foldlevel(lineNr) > currentFoldlevel
+   \      && lineNr <= blockEndLine
+   \      && lineNr >= blockStartLine
+   \)
+        let lineNr = search(searchExpr, '', blockEndLine)
+    endwhile
+
+    " if (lineNr == 0)
+    "     call s:JsGotoDefInner(word, line('.'))
+    " endif
+
+    " restore settings
+    if (a:position == -1)
+        let &magic = saved_magic
+        let &ignorecase = saved_ignorecase
+        let &foldmethod = saved_foldmethod
+    endif
+endfunction
+
+function! JsGotoDef() 
+    call s:JsGotoDefInner(0, -1)
+endfunction!
