@@ -101,6 +101,7 @@ function! s:JsGotoDefInner(wordArg, winView)
 
         let saved_searchReg = @/
     endif
+
     let currentWinView = isFirstCall ? winsaveview() : a:winView
 
     " Step 1: run func
@@ -143,6 +144,7 @@ function! s:JsGotoDefInner(wordArg, winView)
             call s:JsGotoDefGlobal(word)
         endif
     else
+        let @/ = word
         keepjumps normal! n
     endif
 
