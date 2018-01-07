@@ -8,9 +8,19 @@ let g:jsGotodefPath = "src/"
 " Regex will look like this:
 " TODO: search css classes
 " function +word|word *[=:] *(\(|function|\S+ *=>)
-function! s:getSearchExpr(word)
+function! s:getSearchExprPerl(word)
     let strongWord = '\b' . a:word . '\b'
     return 'function\*? +'.strongWord .
+      \ '|\.'.strongWord.' *[=:]' .
+      \ '|'.strongWord.' *[=:]' .
+      \ '|(const|var|let) +'.strongWord .
+      \ '|class +'.strongWord
+endfunction
+
+function! s:getSearchExprVim(word)
+    let strongWord = a:word
+    return '\v' .
+      \  'function\*? +'.strongWord .
       \ '|\.'.strongWord.' *[=:]' .
       \ '|'.strongWord.' *[=:]' .
       \ '|(const|var|let) +'.strongWord .
@@ -21,48 +31,125 @@ endfunction
 " const lalala =
 "   (arg1, arg2) 
 
-function! JsGotoDef()
-    " Step 0: save settings
-    let saved_ack_lhandler = g:ack_lhandler
-    let g:ack_lhandler = ''
-    let saved_hlsearch = &hlsearch
-    set hlsearch
-    let saved_ackprg = g:ackprg
-    let g:ackprg .= " -G js"
+" clear all items with item.bufnr == bufnr
+function! s:FilterLocList(list, bufNumber)
+    let list = deepcopy(a:list)
+    return filter(list, 'v:val.bufnr != a:bufNumber')
+endfunction
 
+function! s:JsGotoDefGlobal(word)
     " let isQuickfixOpened = 0
     " windo if &l:buftype == "quickfix" | let isQuickfixOpened = 1 | endif
-    :cclose
 
-    " Step 1: start function
-    " get word under cursor
-    let word = expand("<cword>")
+    let searchExpr = s:getSearchExprPerl(a:word)
+
+    :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
+    let locList = s:FilterLocList(getloclist(0), bufnr('%'))
+    call setloclist(0, locList)
+
+    if (len(locList) == 1)
+        let @/ = a:word
+        :ll! | keepjumps normal! zzn
+    elseif (len(locList) == 0)
+        echo 'JsGotoDef: NOTHING FOUND'
+    else
+        :cclose
+        if (winnr('$') > 2) 
+            botright lopen 
+            " ничего функционального не несет, только делает
+            " поменьше дергов когда всего одно окно (помимо NERDTree)
+            :NERDTreeClose | NERDTree | wincmd l | wincmd j
+        else 
+            belowright lopen 
+        endif
+    endif
+endfunction
+
+function! s:JsGotoDefInner(wordArg, winView)
+    let isFirstCall = type(a:winView) != 4
+    let word = isFirstCall ? expand("<cword>") : a:wordArg
 
     if (empty(word))
         return
     endif
 
-    let searchCommand = ":LAck! "
+    let currentWinView = isFirstCall ? winsaveview() : a:winView
 
-    let searchExpr = s:getSearchExpr(word)
+    " Step 1: run func
+    let searchExpr = s:getSearchExprVim(word)
 
-    :execute searchCommand."'".searchExpr."' ".g:jsGotodefPath
+    let currentPos = line('.')
+    let currentFoldlevel = foldlevel('.')
+    let blockStartLine = 0
+    let blockEndLine = line('$')
 
-    let locList = getloclist(0)
-
-    if (len(locList) == 1)
-        :ll! | normal! zz
+    let jumpCmdPrefix = isFirstCall ? '' : 'keepjumps '
+    execute jumpCmdPrefix . 'normal! [{'
+    let searchInWholeFile = line('.') == currentPos
+    if (searchInWholeFile)
+        keepjumps normal! gg
     else
-        if (winnr('$') > 2) | botright lopen | else | belowright lopen | endif
-        " следующий if - ничего функционального не несет, только делает
-        " поменьше дергов когда всего одно окно (помимо NERDTree)
-        if (winnr('$') > 2)
-            :NERDTreeClose | NERDTree | wincmd l | wincmd j
-        endif
+        let blockStartLine = line('.')
+        keepjumps normal! ]}
+        let blockEndLine = line('.')
+        keepjumps normal! [{
     endif
 
+    let lineNr = search(searchExpr, '', blockEndLine)
+    while (
+   \         foldlevel(lineNr) > currentFoldlevel
+   \      && lineNr <= blockEndLine
+   \      && lineNr >= blockStartLine
+   \)
+        let lineNr = search(searchExpr, '', blockEndLine)
+    endwhile
+
+    if (lineNr == currentPos)
+        call winrestview(currentWinView)
+        call s:JsGotoDefGlobal(word)
+    elseif (lineNr == 0)
+        if (!searchInWholeFile)
+            call s:JsGotoDefInner(word, currentWinView)
+        else
+            call winrestview(currentWinView)
+            call s:JsGotoDefGlobal(word)
+        endif
+    else
+        let @/ = word
+        keepjumps normal! n
+    endif
+endfunction
+
+function! JsGotoDef() 
+    " Step 0: save settings
+    let saved_magic = &magic
+    let saved_ignorecase = &ignorecase
+    let saved_foldmethod = &foldmethod
+    let saved_searchReg = @/
+
+    let saved_ack_lhandler = g:ack_lhandler
+    let saved_hlsearch = &hlsearch
+    let saved_ackprg = g:ackprg
+
+    " Step 1: set settings for function
+    set magic
+    set foldmethod=syntax
+    set noignorecase
+
+    let g:ack_lhandler = ''
+    set hlsearch
+    let g:ackprg .= " -G js"
+
+    " Step 2: run search
+    call s:JsGotoDefInner(0, 0)
+
     " Step 3: restore settings
+    let &magic = saved_magic
+    let &ignorecase = saved_ignorecase
+    let &foldmethod = saved_foldmethod
+    let @/ = saved_searchReg
+
     let g:ackprg = saved_ackprg
     let g:ack_lhandler = saved_ack_lhandler
     let &hlsearch = saved_hlsearch
-endfunction
+endfunction!
