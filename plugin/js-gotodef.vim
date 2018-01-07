@@ -38,21 +38,9 @@ function! s:FilterLocList(list, bufNumber)
 endfunction
 
 function! s:JsGotoDefGlobal(word)
-    " Step 0: save settings
-    let saved_ack_lhandler = g:ack_lhandler
-    let g:ack_lhandler = ''
-
-    let saved_hlsearch = &hlsearch
-    set hlsearch
-
-    let saved_ackprg = g:ackprg
-    let g:ackprg .= " -G js"
-
     " let isQuickfixOpened = 0
     " windo if &l:buftype == "quickfix" | let isQuickfixOpened = 1 | endif
-    :cclose
 
-    " Step 1: start function
     let searchExpr = s:getSearchExprPerl(a:word)
 
     :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
@@ -65,18 +53,16 @@ function! s:JsGotoDefGlobal(word)
     elseif (len(locList) == 0)
         echo 'JsGotoDef: NOTHING FOUND'
     else
-        if (winnr('$') > 2) | botright lopen | else | belowright lopen | endif
-        " следующий if - ничего функционального не несет, только делает
-        " поменьше дергов когда всего одно окно (помимо NERDTree)
-        if (winnr('$') > 2)
+        :cclose
+        if (winnr('$') > 2) 
+            botright lopen 
+            " ничего функционального не несет, только делает
+            " поменьше дергов когда всего одно окно (помимо NERDTree)
             :NERDTreeClose | NERDTree | wincmd l | wincmd j
+        else 
+            belowright lopen 
         endif
     endif
-
-    " Step 3: restore settings
-    let g:ackprg = saved_ackprg
-    let g:ack_lhandler = saved_ack_lhandler
-    let &hlsearch = saved_hlsearch
 endfunction
 
 function! s:JsGotoDefInner(wordArg, winView)
@@ -85,21 +71,6 @@ function! s:JsGotoDefInner(wordArg, winView)
 
     if (empty(word))
         return
-    endif
-
-
-    " Step 0: save settings
-    if (isFirstCall)
-        let saved_magic = &magic
-        set magic
-
-        let saved_ignorecase = &ignorecase
-        set noignorecase
-
-        let saved_foldmethod = &foldmethod
-        set foldmethod=syntax
-
-        let saved_searchReg = @/
     endif
 
     let currentWinView = isFirstCall ? winsaveview() : a:winView
@@ -147,16 +118,38 @@ function! s:JsGotoDefInner(wordArg, winView)
         let @/ = word
         keepjumps normal! n
     endif
-
-    " restore settings
-    if (isFirstCall)
-        let &magic = saved_magic
-        let &ignorecase = saved_ignorecase
-        let &foldmethod = saved_foldmethod
-        let @/ = saved_searchReg
-    endif
 endfunction
 
 function! JsGotoDef() 
+    " Step 0: save settings
+    let saved_magic = &magic
+    let saved_ignorecase = &ignorecase
+    let saved_foldmethod = &foldmethod
+    let saved_searchReg = @/
+
+    let saved_ack_lhandler = g:ack_lhandler
+    let saved_hlsearch = &hlsearch
+    let saved_ackprg = g:ackprg
+
+    " Step 1: set settings for function
+    set magic
+    set foldmethod=syntax
+    set noignorecase
+
+    let g:ack_lhandler = ''
+    set hlsearch
+    let g:ackprg .= " -G js"
+
+    " Step 2: run search
     call s:JsGotoDefInner(0, 0)
+
+    " Step 3: restore settings
+    let &magic = saved_magic
+    let &ignorecase = saved_ignorecase
+    let &foldmethod = saved_foldmethod
+    let @/ = saved_searchReg
+
+    let g:ackprg = saved_ackprg
+    let g:ack_lhandler = saved_ack_lhandler
+    let &hlsearch = saved_hlsearch
 endfunction!
