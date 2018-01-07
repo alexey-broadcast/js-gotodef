@@ -31,12 +31,20 @@ endfunction
 " const lalala =
 "   (arg1, arg2) 
 
+" clear all items with item.bufnr == bufnr
+function! s:FilterLocList(list, bufNumber)
+    let list = deepcopy(a:list)
+    return filter(list, 'v:val.bufnr != a:bufNumber')
+endfunction
+
 function! s:JsGotoDefGlobal(word)
     " Step 0: save settings
     let saved_ack_lhandler = g:ack_lhandler
     let g:ack_lhandler = ''
+
     let saved_hlsearch = &hlsearch
     set hlsearch
+
     let saved_ackprg = g:ackprg
     let g:ackprg .= " -G js"
 
@@ -48,10 +56,14 @@ function! s:JsGotoDefGlobal(word)
     let searchExpr = s:getSearchExprPerl(a:word)
 
     :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
-    let locList = getloclist(0)
+    let locList = s:FilterLocList(getloclist(0), bufnr('%'))
+    call setloclist(0, locList)
 
     if (len(locList) == 1)
-        :ll! | normal! zz
+        let @/ = a:word
+        :ll! | keepjumps normal! zzn
+    elseif (len(locList) == 0)
+        echo 'JsGotoDef: NOTHING FOUND'
     else
         if (winnr('$') > 2) | botright lopen | else | belowright lopen | endif
         " следующий if - ничего функционального не несет, только делает
@@ -86,6 +98,8 @@ function! s:JsGotoDefInner(wordArg, winView)
 
         let saved_foldmethod = &foldmethod
         set foldmethod=syntax
+
+        let saved_searchReg = @/
     endif
     let currentWinView = isFirstCall ? winsaveview() : a:winView
 
@@ -121,15 +135,15 @@ function! s:JsGotoDefInner(wordArg, winView)
     if (lineNr == currentPos)
         call winrestview(currentWinView)
         call s:JsGotoDefGlobal(word)
-    endif
-
-    if (lineNr == 0)
+    elseif (lineNr == 0)
         if (!searchInWholeFile)
             call s:JsGotoDefInner(word, currentWinView)
         else
             call winrestview(currentWinView)
             call s:JsGotoDefGlobal(word)
         endif
+    else
+        keepjumps normal! n
     endif
 
     " restore settings
@@ -137,6 +151,7 @@ function! s:JsGotoDefInner(wordArg, winView)
         let &magic = saved_magic
         let &ignorecase = saved_ignorecase
         let &foldmethod = saved_foldmethod
+        let @/ = saved_searchReg
     endif
 endfunction
 
