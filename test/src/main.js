@@ -63,6 +63,7 @@ function func() {
     popka
     let piska
 
+    piska
   }
 
   variable

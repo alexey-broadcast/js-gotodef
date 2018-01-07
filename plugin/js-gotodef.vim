@@ -120,6 +120,7 @@ function! s:JsGotoDefInner(wordArg, winView)
 
     if (lineNr == currentPos)
         call winrestview(currentWinView)
+        call s:JsGotoDefGlobal(word)
     endif
 
     if (lineNr == 0)
