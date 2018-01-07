@@ -31,7 +31,7 @@ endfunction
 " const lalala =
 "   (arg1, arg2) 
 
-function! JsGotoDef1()
+function! s:JsGotoDefGlobal(word)
     " Step 0: save settings
     let saved_ack_lhandler = g:ack_lhandler
     let g:ack_lhandler = ''
@@ -45,19 +45,9 @@ function! JsGotoDef1()
     :cclose
 
     " Step 1: start function
-    " get word under cursor
-    let word = expand("<cword>")
+    let searchExpr = s:getSearchExprPerl(a:word)
 
-    if (empty(word))
-        return
-    endif
-
-    let searchCommand = ":LAck! "
-
-    let searchExpr = s:getSearchExprPerl(word)
-
-    :execute searchCommand."'".searchExpr."' ".g:jsGotodefPath
-
+    :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
     let locList = getloclist(0)
 
     if (len(locList) == 1)
@@ -125,8 +115,12 @@ function! s:JsGotoDefInner(wordArg, position)
         let lineNr = search(searchExpr, '', blockEndLine)
     endwhile
 
-    if (lineNr == 0 && !searchInWholeFile)
-        call s:JsGotoDefInner(word, line('.'))
+    if (lineNr == 0)
+        if (!searchInWholeFile)
+            call s:JsGotoDefInner(word, line('.'))
+        else
+            call s:JsGotoDefGlobal(word)
+        endif
     endif
 
     " restore settings

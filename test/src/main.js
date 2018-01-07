@@ -12,12 +12,14 @@ function func() {
   }
 
   if (true) {
-    let variable = 'super inner'
 
     variable
+    lalka
   }
 
   variable
 }
 
 variable
+
+lalka

@@ -1,0 +1,1 @@
+function lalka() = 1
