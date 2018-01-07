@@ -67,9 +67,17 @@ function! s:JsGotoDefGlobal(word)
     let &hlsearch = saved_hlsearch
 endfunction
 
-function! s:JsGotoDefInner(wordArg, position) 
+function! s:JsGotoDefInner(wordArg, winView)
+    let isFirstCall = type(a:winView) != 4
+    let word = isFirstCall ? expand("<cword>") : a:wordArg
+
+    if (empty(word))
+        return
+    endif
+
+
     " Step 0: save settings
-    if (a:position == -1)
+    if (isFirstCall)
         let saved_magic = &magic
         set magic
 
@@ -79,14 +87,9 @@ function! s:JsGotoDefInner(wordArg, position)
         let saved_foldmethod = &foldmethod
         set foldmethod=syntax
     endif
+    let currentWinView = isFirstCall ? winsaveview() : a:winView
 
     " Step 1: run func
-    let word = a:position > -1 ? a:wordArg : expand("<cword>")
-
-    if (empty(word))
-        return
-    endif
-
     let searchExpr = s:getSearchExprVim(word)
 
     let currentPos = line('.')
@@ -94,11 +97,11 @@ function! s:JsGotoDefInner(wordArg, position)
     let blockStartLine = 0
     let blockEndLine = line('$')
 
-    let jumpCmdPrefix = a:position > -1 ? 'keepjumps ' : ''
+    let jumpCmdPrefix = isFirstCall ? '' : 'keepjumps '
     execute jumpCmdPrefix . 'normal! [{'
     let searchInWholeFile = line('.') == currentPos
     if (searchInWholeFile)
-        execute jumpCmdPrefix . 'normal! gg'
+        keepjumps normal! gg
     else
         let blockStartLine = line('.')
         keepjumps normal! ]}
@@ -115,16 +118,21 @@ function! s:JsGotoDefInner(wordArg, position)
         let lineNr = search(searchExpr, '', blockEndLine)
     endwhile
 
+    if (lineNr == currentPos)
+        call winrestview(currentWinView)
+    endif
+
     if (lineNr == 0)
         if (!searchInWholeFile)
-            call s:JsGotoDefInner(word, line('.'))
+            call s:JsGotoDefInner(word, currentWinView)
         else
+            call winrestview(currentWinView)
             call s:JsGotoDefGlobal(word)
         endif
     endif
 
     " restore settings
-    if (a:position == -1)
+    if (isFirstCall)
         let &magic = saved_magic
         let &ignorecase = saved_ignorecase
         let &foldmethod = saved_foldmethod
@@ -132,5 +140,5 @@ function! s:JsGotoDefInner(wordArg, position)
 endfunction
 
 function! JsGotoDef() 
-    call s:JsGotoDefInner(0, -1)
+    call s:JsGotoDefInner(0, 0)
 endfunction!

@@ -1,3 +1,48 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 some text here
 
 let variable = false
@@ -15,6 +60,9 @@ function func() {
 
     variable
     lalka
+    popka
+    let piska
+
   }
 
   variable
@@ -23,3 +71,48 @@ function func() {
 variable
 
 lalka
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
