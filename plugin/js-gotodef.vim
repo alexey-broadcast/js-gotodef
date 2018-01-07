@@ -91,7 +91,7 @@ function! s:JsGotoDefInner(wordArg, position)
     endif
 
     " Step 1: run func
-    let word = a:wordArg ? a:wordArg : expand("<cword>")
+    let word = a:position > -1 ? a:wordArg : expand("<cword>")
 
     if (empty(word))
         return
@@ -105,14 +105,15 @@ function! s:JsGotoDefInner(wordArg, position)
     let blockEndLine = line('$')
 
     let jumpCmdPrefix = a:position > -1 ? 'keepjumps ' : ''
-    execute jumpCmdPrefix . 'normal! ]}'
+    execute jumpCmdPrefix . 'normal! [{'
     let searchInWholeFile = line('.') == currentPos
     if (searchInWholeFile)
         execute jumpCmdPrefix . 'normal! gg'
     else
+        let blockStartLine = line('.')
+        keepjumps normal! ]}
         let blockEndLine = line('.')
         keepjumps normal! [{
-        let blockStartLine = line('.')
     endif
 
     let lineNr = search(searchExpr, '', blockEndLine)
@@ -124,9 +125,9 @@ function! s:JsGotoDefInner(wordArg, position)
         let lineNr = search(searchExpr, '', blockEndLine)
     endwhile
 
-    " if (lineNr == 0)
-    "     call s:JsGotoDefInner(word, line('.'))
-    " endif
+    if (lineNr == 0 && !searchInWholeFile)
+        call s:JsGotoDefInner(word, line('.'))
+    endif
 
     " restore settings
     if (a:position == -1)
