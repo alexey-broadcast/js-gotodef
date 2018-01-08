@@ -10,11 +10,13 @@ let g:jsGotodefPath = "src/"
 " function +word|word *[=:] *(\(|function|\S+ *=>)
 function! s:getSearchExprPerl(word)
     let strongWord = '\b' . a:word . '\b'
-    return 'function\*? +'.strongWord .
-      \ '|\.'.strongWord.' *[=:]' .
-      \ '|'.strongWord.' *[=:]' .
-      \ '|(const|var|let) +'.strongWord .
-      \ '|class +'.strongWord
+
+    let func = 'function\*? +'.strongWord
+    let def = strongWord.' *[=:]'
+    let prop = '\.'.strongWord.' *[=:]'
+    let var = '(const|var|let) +'.strongWord
+    let class = 'class +'.strongWord
+    return join([func, def, prop, var, class], '|')
 endfunction
 
 " bug: 
