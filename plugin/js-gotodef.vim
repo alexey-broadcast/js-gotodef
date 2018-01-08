@@ -17,24 +17,20 @@ function! s:getSearchExprPerl(word)
       \ '|class +'.strongWord
 endfunction
 
-function! s:getSearchExprVim(word)
-    let strongWord = a:word
-    return '\v' .
-      \  'function\*? +'.strongWord .
-      \ '|\.'.strongWord.' *[=:]' .
-      \ '|'.strongWord.' *[=:]' .
-      \ '|(const|var|let) +'.strongWord .
-      \ '|class +'.strongWord
-endfunction
-
 " bug: 
 " const lalala =
 "   (arg1, arg2) 
 
 " clear all items with item.bufnr == bufnr
-function! s:FilterLocList(list, bufNumber)
+function! s:FilterLocListNotInBuf(list, bufNumber)
     let list = deepcopy(a:list)
     return filter(list, 'v:val.bufnr != a:bufNumber')
+endfunction
+
+" clear all items with item.bufnr != bufnr
+function! s:FilterLocListOnlyInBuf(list, bufNumber)
+    let list = deepcopy(a:list)
+    return filter(list, 'v:val.bufnr == a:bufNumber')
 endfunction
 
 function! s:JsGotoDefGlobal(word)
@@ -44,7 +40,7 @@ function! s:JsGotoDefGlobal(word)
     let searchExpr = s:getSearchExprPerl(a:word)
 
     :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
-    let locList = s:FilterLocList(getloclist(0), bufnr('%'))
+    let locList = s:FilterLocListNotInBuf(getloclist(0), bufnr('%'))
     call setloclist(0, locList)
 
     if (len(locList) == 1)
@@ -65,52 +61,51 @@ function! s:JsGotoDefGlobal(word)
     endif
 endfunction
 
-function! s:JsGotoDefInner(word, winView)
-    let isFirstCall = type(a:winView) != 4
-    let currentWinView = isFirstCall ? winsaveview() : a:winView
-
-    " Step 1: run func
-    let searchExpr = s:getSearchExprVim(a:word)
-
-    let currentPos = line('.')
-    let currentFoldlevel = foldlevel('.')
-    let blockStartLine = 0
-    let blockEndLine = line('$')
-
-    let jumpCmdPrefix = isFirstCall ? '' : 'keepjumps '
-    execute jumpCmdPrefix . 'normal! [{'
-    let searchInWholeFile = line('.') == currentPos
-    if (searchInWholeFile)
-        keepjumps normal! gg
-    else
-        let blockStartLine = line('.')
-        keepjumps normal! ]}
-        let blockEndLine = line('.')
-        keepjumps normal! [{
-    endif
-
-    let lineNr = search(searchExpr, '', blockEndLine)
-    while (
-   \    foldlevel(lineNr) > currentFoldlevel
-   \ && lineNr <= blockEndLine
-   \ && lineNr >= blockStartLine
-   \)
-        let lineNr = search(searchExpr, '', blockEndLine)
+function! s:getFoldBound(lnum, startOrEnd)
+    let currentFoldlevel = foldlevel(a:lnum)
+    let dLnum = (a:startOrEnd == 'start' ? -1 : 1)
+    let result = a:lnum
+    while (foldlevel(result) >= currentFoldlevel && result >= 0 && result <= line('$'))
+        let result = result + dLnum
     endwhile
+    let result = result - dLnum " один из шагов в цикле был лишний
+    return result
+endfunction
 
-    if (lineNr == currentPos)
-        call winrestview(currentWinView)
-        call s:JsGotoDefGlobal(a:word)
-    elseif (lineNr == 0)
-        if (!searchInWholeFile)
-            call s:JsGotoDefInner(a:word, currentWinView)
-        else
-            call winrestview(currentWinView)
-            call s:JsGotoDefGlobal(word)
+function! s:RecursiveSearchInFile(list, currentLine)
+    let foldStartLnum = s:getFoldBound(a:currentLine, 'start')
+    let foldEndLnum = s:getFoldBound(a:currentLine, 'end')
+
+    for occurence in a:list
+        if (
+       \       occurence.lnum >= foldStartLnum
+       \    && occurence.lnum <= foldEndLnum
+       \    && foldlevel(occurence.lnum) == foldlevel(a:currentLine)
+       \)
+            return occurence.lnum
         endif
+    endfor
+
+    if (foldStartLnum > 0)
+        return s:RecursiveSearchInFile(a:list, foldStartLnum - 1)
     else
-        let @/ = a:word
-        keepjumps normal! n
+        return -1
+    endif
+endfunction
+
+function! s:JsGotoDefInner(word)
+    let searchExpr = s:getSearchExprPerl(a:word)
+
+    let currentFileDir = expand('%:p:h')
+    :execute ":LAck! '".searchExpr."' ".currentFileDir."*"
+    let locList = s:FilterLocListOnlyInBuf(getloclist(0), bufnr('%'))
+    let lnum = s:RecursiveSearchInFile(locList, line('.'))
+
+    if (lnum == -1 || lnum == line('.'))
+        call s:JsGotoDefGlobal(a:word)
+    else
+        call setpos('.', [0, lnum, 0, 0, 0])
+        call search(a:word, 'ce')
     endif
 endfunction
 
@@ -141,7 +136,7 @@ function! JsGotoDef()
     let g:ackprg .= " -G js"
 
     " Step 2: run search
-    call s:JsGotoDefInner(word, 0)
+    call s:JsGotoDefInner(word)
 
     " Step 3: restore settings
     let &magic = saved_magic
