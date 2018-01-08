@@ -65,18 +65,12 @@ function! s:JsGotoDefGlobal(word)
     endif
 endfunction
 
-function! s:JsGotoDefInner(wordArg, winView)
+function! s:JsGotoDefInner(word, winView)
     let isFirstCall = type(a:winView) != 4
-    let word = isFirstCall ? expand("<cword>") : a:wordArg
-
-    if (empty(word))
-        return
-    endif
-
     let currentWinView = isFirstCall ? winsaveview() : a:winView
 
     " Step 1: run func
-    let searchExpr = s:getSearchExprVim(word)
+    let searchExpr = s:getSearchExprVim(a:word)
 
     let currentPos = line('.')
     let currentFoldlevel = foldlevel('.')
@@ -97,30 +91,36 @@ function! s:JsGotoDefInner(wordArg, winView)
 
     let lineNr = search(searchExpr, '', blockEndLine)
     while (
-   \         foldlevel(lineNr) > currentFoldlevel
-   \      && lineNr <= blockEndLine
-   \      && lineNr >= blockStartLine
+   \    foldlevel(lineNr) > currentFoldlevel
+   \ && lineNr <= blockEndLine
+   \ && lineNr >= blockStartLine
    \)
         let lineNr = search(searchExpr, '', blockEndLine)
     endwhile
 
     if (lineNr == currentPos)
         call winrestview(currentWinView)
-        call s:JsGotoDefGlobal(word)
+        call s:JsGotoDefGlobal(a:word)
     elseif (lineNr == 0)
         if (!searchInWholeFile)
-            call s:JsGotoDefInner(word, currentWinView)
+            call s:JsGotoDefInner(a:word, currentWinView)
         else
             call winrestview(currentWinView)
             call s:JsGotoDefGlobal(word)
         endif
     else
-        let @/ = word
+        let @/ = a:word
         keepjumps normal! n
     endif
 endfunction
 
 function! JsGotoDef() 
+    let word = expand("<cword>")
+
+    if (empty(word))
+        return
+    endif
+
     " Step 0: save settings
     let saved_magic = &magic
     let saved_ignorecase = &ignorecase
@@ -141,7 +141,7 @@ function! JsGotoDef()
     let g:ackprg .= " -G js"
 
     " Step 2: run search
-    call s:JsGotoDefInner(0, 0)
+    call s:JsGotoDefInner(word, 0)
 
     " Step 3: restore settings
     let &magic = saved_magic
