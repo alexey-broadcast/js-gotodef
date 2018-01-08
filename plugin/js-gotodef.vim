@@ -27,10 +27,22 @@ function! s:FilterLocListNotInBuf(list, bufNumber)
     return filter(list, 'v:val.bufnr != a:bufNumber')
 endfunction
 
-" clear all items with item.bufnr != bufnr
+" clear all items with item.bufnr == bufnr
+function! s:FilterLocListNotInTest(list)
+    let list = deepcopy(a:list)
+    return filter(list, "match(bufname(v:val.bufnr), '/__test__/') == -1")
+endfunction
+
+" clear all items that are inside '__test__' folder
 function! s:FilterLocListOnlyInBuf(list, bufNumber)
     let list = deepcopy(a:list)
     return filter(list, 'v:val.bufnr == a:bufNumber')
+endfunction
+
+" clear all items that are not js-files
+function! s:FilterLocListOnlyJS(list)
+    let list = deepcopy(a:list)
+    return filter(list, "bufname(v:val.bufnr)[len(bufname(v:val.bufnr)) - 3:len(bufname(v:val.bufnr))] == '.js'")
 endfunction
 
 function! s:JsGotoDefGlobal(word)
@@ -40,7 +52,14 @@ function! s:JsGotoDefGlobal(word)
     let searchExpr = s:getSearchExprPerl(a:word)
 
     :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
-    let locList = s:FilterLocListNotInBuf(getloclist(0), bufnr('%'))
+    let locList = getloclist(0)
+    let locList = s:FilterLocListNotInBuf(locList, bufnr('%'))
+    let locList = s:FilterLocListOnlyJS(locList)
+
+    let currentFileDir = expand('%:p:h')
+    if (match(currentFileDir, '/__test__/') == -1)
+        let locList = s:FilterLocListNotInTest(locList)
+    endif
     call setloclist(0, locList)
 
     if (len(locList) == 1)
