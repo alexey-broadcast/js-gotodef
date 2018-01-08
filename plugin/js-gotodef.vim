@@ -44,8 +44,10 @@ function! s:JsGotoDefGlobal(word)
     call setloclist(0, locList)
 
     if (len(locList) == 1)
-        let @/ = a:word
-        :ll! | keepjumps normal! zzn
+        normal! m'
+        :ll!
+        normal! zz 
+        call search(a:word, 'ce')
     elseif (len(locList) == 0)
         echo 'JsGotoDef: NOTHING FOUND'
     else
@@ -104,6 +106,7 @@ function! s:JsGotoDefInner(word)
     if (lnum == -1 || lnum == line('.'))
         call s:JsGotoDefGlobal(a:word)
     else
+        normal! m'
         call setpos('.', [0, lnum, 0, 0, 0])
         call search(a:word, 'ce')
     endif
@@ -117,19 +120,14 @@ function! JsGotoDef()
     endif
 
     " Step 0: save settings
-    let saved_magic = &magic
-    let saved_ignorecase = &ignorecase
     let saved_foldmethod = &foldmethod
-    let saved_searchReg = @/
 
     let saved_ack_lhandler = g:ack_lhandler
     let saved_hlsearch = &hlsearch
     let saved_ackprg = g:ackprg
 
     " Step 1: set settings for function
-    set magic
     set foldmethod=syntax
-    set noignorecase
 
     let g:ack_lhandler = ''
     set hlsearch
@@ -139,10 +137,7 @@ function! JsGotoDef()
     call s:JsGotoDefInner(word)
 
     " Step 3: restore settings
-    let &magic = saved_magic
-    let &ignorecase = saved_ignorecase
     let &foldmethod = saved_foldmethod
-    let @/ = saved_searchReg
 
     let g:ackprg = saved_ackprg
     let g:ack_lhandler = saved_ack_lhandler
