@@ -22,64 +22,40 @@ endfunction
 "   (arg1, arg2) 
 
 " clear all items with item.bufnr == bufnr
-function! s:FilterLocListNotInBuf(list, bufNumber)
-    let list = deepcopy(a:list)
-    return filter(list, 'v:val.bufnr != a:bufNumber')
+function! s:NotInBuf(item, bufNumber)
+    return a:item.bufnr != a:bufNumber
 endfunction
+let s:notInBuf = function('s:NotInBuf')
 
 " clear all items with item.bufnr == bufnr
-function! s:FilterLocListNotInTest(list)
-    let list = deepcopy(a:list)
-    return filter(list, "match(bufname(v:val.bufnr), '/__test__/') == -1")
+function! s:NotInTest(item)
+    return bufname(a:item.bufnr) !~# '__test__'
 endfunction
+let s:notInTest = function('s:NotInTest')
 
 " clear all items that are inside '__test__' folder
-function! s:FilterLocListOnlyInBuf(list, bufNumber)
-    let list = deepcopy(a:list)
-    return filter(list, 'v:val.bufnr == a:bufNumber')
+function! s:OnlyInBuf(item, bufNumber)
+    return a:item.bufnr == a:bufNumber
 endfunction
+let s:onlyInBuf = function('s:OnlyInBuf')
 
 " clear all items that are not js-files
-function! s:FilterLocListOnlyJS(list)
-    let list = deepcopy(a:list)
-    return filter(list, "bufname(v:val.bufnr)[len(bufname(v:val.bufnr)) - 3:len(bufname(v:val.bufnr))] == '.js'")
+function s:OnlyJS(item)
+    return bufname(a:item.bufnr) =~# '\.js$'
 endfunction
+let s:onlyJS = function('s:OnlyJS')
 
-function! s:JsGotoDefGlobal(word)
-    " let isQuickfixOpened = 0
-    " windo if &l:buftype == "quickfix" | let isQuickfixOpened = 1 | endif
+" clear items with 'PropTypes'
+function! s:NotPropTypes(item)
+    return a:item.text !~# 'PropTypes'
+endfunction
+let s:notPropTypes = function('s:NotPropTypes')
 
-    let searchExpr = s:getSearchExprPerl(a:word)
-
-    :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
-    let locList = getloclist(0)
-    let locList = s:FilterLocListNotInBuf(locList, bufnr('%'))
-    let locList = s:FilterLocListOnlyJS(locList)
-
-    let currentFileDir = expand('%:p:h')
-    if (match(currentFileDir, '/__test__/') == -1)
-        let locList = s:FilterLocListNotInTest(locList)
-    endif
-    call setloclist(0, locList)
-
-    if (len(locList) == 1)
-        normal! m'
-        :ll!
-        normal! zz 
-        call search(a:word, 'ce')
-    elseif (len(locList) == 0)
-        echo 'JsGotoDef: NOTHING FOUND'
-    else
-        :cclose
-        if (winnr('$') > 2) 
-            botright lopen 
-            " ничего функционального не несет, только делает
-            " поменьше дергов когда всего одно окно (помимо NERDTree)
-            :NERDTreeClose | NERDTree | wincmd l | wincmd j
-        else 
-            belowright lopen 
-        endif
-    endif
+function s:FilterList(list, fn, ...)
+    let bufNumber = get(a:, 1, -1)
+    let list = deepcopy(a:list)
+    let postfix = '(v:val'.(bufNumber > -1 ? ', bufNumber' : '').')'
+    return filter(list, string(a:fn).postfix)
 endfunction
 
 function! s:getFoldBound(lnum, startOrEnd)
@@ -119,7 +95,10 @@ function! s:JsGotoDefInner(word)
 
     let currentFileDir = expand('%:p:h')
     :execute ":LAck! '".searchExpr."' ".currentFileDir."*"
-    let locList = s:FilterLocListOnlyInBuf(getloclist(0), bufnr('%'))
+    let locList = getloclist(0)
+    let locList = s:FilterList(locList, s:onlyInBuf, bufnr('%'))
+    let locList = s:FilterList(locList, s:notPropTypes)
+
     let lnum = s:RecursiveSearchInFile(locList, line('.'))
 
     if (lnum == -1 || lnum == line('.'))
@@ -128,6 +107,44 @@ function! s:JsGotoDefInner(word)
         normal! m'
         call setpos('.', [0, lnum, 0, 0, 0])
         call search(a:word, 'ce')
+    endif
+endfunction
+
+function! s:JsGotoDefGlobal(word)
+    " let isQuickfixOpened = 0
+    " windo if &l:buftype == "quickfix" | let isQuickfixOpened = 1 | endif
+
+    let searchExpr = s:getSearchExprPerl(a:word)
+
+    :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
+    let locList = getloclist(0)
+    let locList = s:FilterList(locList, s:notInBuf, bufnr('%'))
+    let locList = s:FilterList(locList, s:onlyJS)
+    let locList = s:FilterList(locList, s:notPropTypes)
+
+    let currentFileDir = expand('%:p:h')
+    if (currentFileDir !~# '__test__')
+        let locList = s:FilterList(locList, s:notInTest)
+    endif
+    call setloclist(0, locList)
+
+    if (len(locList) == 1)
+        normal! m'
+        :ll!
+        normal! zz 
+        call search(a:word, 'ce')
+    elseif (len(locList) == 0)
+        echo 'JsGotoDef: NOTHING FOUND'
+    else
+        :cclose
+        if (winnr('$') > 2) 
+            botright lopen 
+            " ничего функционального не несет, только делает
+            " поменьше дергов когда всего одно окно (помимо NERDTree)
+            :NERDTreeClose | NERDTree | wincmd l | wincmd j
+        else 
+            belowright lopen 
+        endif
     endif
 endfunction
 
