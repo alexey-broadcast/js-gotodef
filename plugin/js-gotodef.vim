@@ -8,11 +8,15 @@ let g:jsGotodefPath = "src/"
 " Regex will look like this:
 " TODO: search css classes
 " function +word|word *[=:] *(\(|function|\S+ *=>)
-function! s:getSearchExprPerl(word)
-    let strongWord = '\b' . a:word . '\b'
+function! s:getSearchExprPerl(...)
+    let word = a:1
+    let isPartSearch = a:0 > 1 && a:2
+    let strongWord = isPartSearch ? '\b[a-zA-Z0-9_]*' . word . '[a-zA-Z0-9_]*\b' : '\b' . word . '\b'
 
     let func = 'function\*? +'.strongWord
-    let def = strongWord.' *[=:]'
+    " removed ':'
+    " let def = strongWord.' *[=:]'
+    let def = strongWord.' *='
     let prop = '\.'.strongWord.' *[=:]'
     let var = '(const|var|let) +'.strongWord
     let class = 'class +'.strongWord
@@ -120,6 +124,15 @@ function! s:JsGotoDefGlobal(word)
 
     :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
     let locList = getloclist(0)
+
+    if (len(locList) == 0)
+        echom 'len = 0'
+        let searchExpr = s:getSearchExprPerl(a:word, 1)
+        :execute ":LAck! '".searchExpr."' ".g:jsGotodefPath
+        let locList = getloclist(0)
+        echom len(locList)
+    endif
+
     let locList = s:FilterList(locList, s:notInBuf, bufnr('%'))
     let locList = s:FilterList(locList, s:onlyJS)
     let locList = s:FilterList(locList, s:notPropTypes)
