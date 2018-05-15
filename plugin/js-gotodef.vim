@@ -5,6 +5,16 @@ let g:loaded_js_gotodef = 1
 
 let g:jsGotodefPath = "src/"
 
+function! s:getComplexClassname(word)
+    let res = ''
+    for char in split(a:word, '\zs')
+        if (char =~ '[a-zA-Z0-9]')
+            res = res . char
+        endif
+    endfor
+    return res
+endfunction
+
 " Regex will look like this:
 " TODO: search css classes
 " function +word|word *[=:] *(\(|function|\S+ *=>)
@@ -108,12 +118,13 @@ function! s:JsGotoDefInner(word)
     let lnum = s:RecursiveSearchInFile(locList, line('.'))
 
     if (lnum == -1 || lnum == line('.'))
-        call s:JsGotoDefGlobal(a:word)
-    else
-        normal! m'
-        call setpos('.', [0, lnum, 0, 0, 0])
-        call search(a:word, 'ce')
+        return s:JsGotoDefGlobal(a:word)
     endif
+
+    normal! m'
+    call setpos('.', [0, lnum, 0, 0, 0])
+    call search(a:word, 'ce')
+    return 1
 endfunction
 
 function! s:JsGotoDefGlobal(word)
@@ -148,8 +159,9 @@ function! s:JsGotoDefGlobal(word)
         :ll!
         normal! zz 
         call search(a:word, 'ce')
+        return 1
     elseif (len(locList) == 0)
-        echo 'JsGotoDef: NOTHING FOUND'
+        return 0
     else
         :cclose
         if (winnr('$') > 2) 
@@ -160,12 +172,14 @@ function! s:JsGotoDefGlobal(word)
         else 
             belowright lopen 
         endif
+        return 1
     endif
 endfunction
 
 function! JsGotoDef() 
     let word = expand("<cword>")
-
+    let WORD = expand("<CWORD>")
+    
     if (empty(word))
         return
     endif
@@ -185,7 +199,10 @@ function! JsGotoDef()
     let g:ackprg .= " -G js"
 
     " Step 2: run search
-    call s:JsGotoDefInner(word)
+    let result = s:JsGotoDefInner(word)
+    if (!result)
+        call s:JsGotoDefInner(s:getComplexClassname(WORD))
+    endif
 
     " Step 3: restore settings
     let &foldmethod = saved_foldmethod
